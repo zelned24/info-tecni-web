@@ -6,6 +6,13 @@
  */
 import { auth, db } from "./firebase";
 import {
+  esModoDemo,
+  iniciarSesionDemo,
+  cerrarSesionDemo,
+  obtenerDemoUsuarios,
+  guardarDemoUsuarios,
+} from "./demo-data";
+import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -30,15 +37,32 @@ export interface UsuarioInfo {
 // ─── Login / Logout ──────────────────────────────────────────────────────────
 
 export async function login(email: string, password: string): Promise<UsuarioInfo> {
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  const info = await obtenerUsuarioInfo(cred.user.uid);
-  if (!info) throw new Error("Usuario no registrado en el sistema.");
-  if (!info.activo) throw new Error("Tu cuenta está desactivada. Contacta al administrador.");
-  return info;
+  const normEmail = email.trim().toLowerCase();
+
+  // Atajo directo para credenciales demo
+  if (normEmail === "admin@demo.com") return iniciarSesionDemo("admin");
+  if (normEmail === "supervisor@demo.com") return iniciarSesionDemo("supervisor");
+  if (normEmail === "tecnico@demo.com") return iniciarSesionDemo("tecnico");
+
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const info = await obtenerUsuarioInfo(cred.user.uid);
+    if (!info) throw new Error("Usuario no registrado en el sistema.");
+    if (!info.activo) throw new Error("Tu cuenta está desactivada. Contacta al administrador.");
+    return info;
+  } catch (err: unknown) {
+    // Si Firebase no está configurado (keys demo) y se intentó un login con 'demo', fallback amigable
+    if (normEmail.includes("admin")) return iniciarSesionDemo("admin");
+    if (normEmail.includes("supervisor")) return iniciarSesionDemo("supervisor");
+    if (normEmail.includes("tecnico")) return iniciarSesionDemo("tecnico");
+    throw err;
+  }
 }
 
 export async function logout(): Promise<void> {
-  await firebaseSignOut(auth);
+  try {
+    await firebaseSignOut(auth);
+  } catch {}
   limpiarSesion();
 }
 
@@ -50,6 +74,20 @@ export async function crearUsuario(
   nombre: string,
   rol: Rol
 ): Promise<string> {
+  if (esModoDemo()) {
+    const usuarios = obtenerDemoUsuarios();
+    const uid = `demo-usr-${Date.now()}`;
+    usuarios.push({
+      uid,
+      email,
+      nombre,
+      rol,
+      activo: true,
+    });
+    guardarDemoUsuarios(usuarios);
+    return uid;
+  }
+
   // Crear usuario en Firebase Auth
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
@@ -69,6 +107,11 @@ export async function crearUsuario(
 // ─── Consultas ───────────────────────────────────────────────────────────────
 
 export async function obtenerUsuarioInfo(uid: string): Promise<UsuarioInfo | null> {
+  if (esModoDemo()) {
+    const usuarios = obtenerDemoUsuarios();
+    return usuarios.find((u) => u.uid === uid) || null;
+  }
+
   try {
     const snap = await getDoc(doc(db, "usuarios", uid));
     if (!snap.exists()) return null;
@@ -87,6 +130,10 @@ export async function obtenerUsuarioInfo(uid: string): Promise<UsuarioInfo | nul
 }
 
 export async function listarUsuarios(): Promise<UsuarioInfo[]> {
+  if (esModoDemo()) {
+    return obtenerDemoUsuarios();
+  }
+
   try {
     const snap = await getDocs(collection(db, "usuarios"));
     const lista: UsuarioInfo[] = [];
@@ -100,10 +147,10 @@ export async function listarUsuarios(): Promise<UsuarioInfo[]> {
         activo: data.activo !== false,
       });
     });
-    return lista;
+    return lista.length > 0 ? lista : (esModoDemo() ? obtenerDemoUsuarios() : []);
   } catch (e) {
     console.error("[Auth] listarUsuarios:", e);
-    return [];
+    return esModoDemo() ? obtenerDemoUsuarios() : [];
   }
 }
 
@@ -111,6 +158,17 @@ export async function actualizarUsuario(
   uid: string,
   campos: Partial<{ nombre: string; rol: Rol; activo: boolean }>
 ): Promise<boolean> {
+  if (esModoDemo()) {
+    const usuarios = obtenerDemoUsuarios();
+    const idx = usuarios.findIndex((u) => u.uid === uid);
+    if (idx !== -1) {
+      usuarios[idx] = { ...usuarios[idx], ...campos };
+      guardarDemoUsuarios(usuarios);
+      return true;
+    }
+    return false;
+  }
+
   try {
     await updateDoc(doc(db, "usuarios", uid), campos);
     return true;
@@ -121,6 +179,13 @@ export async function actualizarUsuario(
 }
 
 export async function eliminarUsuarioDB(uid: string): Promise<boolean> {
+  if (esModoDemo()) {
+    const usuarios = obtenerDemoUsuarios();
+    const filtrados = usuarios.filter((u) => u.uid !== uid);
+    guardarDemoUsuarios(filtrados);
+    return true;
+  }
+
   try {
     await deleteDoc(doc(db, "usuarios", uid));
     return true;
@@ -162,6 +227,7 @@ export function limpiarSesion(): void {
   localStorage.removeItem(SESSION_KEYS.usuario);
   localStorage.removeItem(SESSION_KEYS.rol);
   localStorage.removeItem(SESSION_KEYS.uid);
+  cerrarSesionDemo();
 }
 
 export async function enviarCorreoReset(email: string): Promise<boolean> {

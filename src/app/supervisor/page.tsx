@@ -18,6 +18,7 @@ import {
 } from "@/lib/firestore-service";
 import { setListaAgencias } from "@/lib/store";
 import { obtenerSesion, logout } from "@/lib/auth-service";
+import { esModoDemo } from "@/lib/demo-data";
 import type { DocumentData } from "firebase/firestore";
 import { Modal } from "@/components/Modal";
 
@@ -53,6 +54,7 @@ export default function SupervisorPage() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Todos");
   const [darkMode, setDarkMode] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   // Modal State
   const [modal, setModal] = useState<{ isOpen: boolean, type: "alert" | "prompt" | "confirm" | "danger", title: string, msg: string, inputVal: string, action: (val?: string) => void } | null>(null);
@@ -69,6 +71,7 @@ export default function SupervisorPage() {
     setSesion(s);
     setUsuario(s.nombre);
     setDarkMode(localStorage.getItem("app_theme") === "dark");
+    setIsDemo(esModoDemo());
     cargarTodo();
   }, [router]);
 
@@ -218,6 +221,20 @@ export default function SupervisorPage() {
             <span className="desktop-hide" style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none" }}>
               {sesion?.nombre} <span style={{ fontSize: 10, opacity: 0.6, verticalAlign: "middle" }}>▼</span>
             </span>
+            {isDemo && (
+              <span style={{
+                background: "rgba(255, 152, 0, 0.15)",
+                color: "#e65100",
+                border: "1px solid rgba(255, 152, 0, 0.4)",
+                padding: "2px 6px",
+                borderRadius: 10,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.5px"
+              }}>
+                DEMO
+              </span>
+            )}
           </div>
 
           {showMenu && (

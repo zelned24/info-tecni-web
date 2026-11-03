@@ -11,6 +11,7 @@ import {
   getDocument,
 } from "@/lib/firestore-service";
 import { obtenerSesion, logout } from "@/lib/auth-service";
+import { esModoDemo } from "@/lib/demo-data";
 import {
   getReporteActual,
   setMateriales,
@@ -56,6 +57,7 @@ export default function TecnicoPage() {
   const [cargando, setCargando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
   const [sesion, setSesion] = useState<{ nombre: string; rol: string; uid: string } | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [, setTick] = useState(0);
@@ -72,6 +74,7 @@ export default function TecnicoPage() {
     setSesion(s);
     setTecnico(s.nombre);
     setDarkMode(localStorage.getItem("app_theme") === "dark");
+    setIsDemo(esModoDemo());
     setFecha(new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" }));
     
     async function inicializar() {
@@ -258,6 +261,20 @@ export default function TecnicoPage() {
             <span className="desktop-hide" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none" }}>
               {tecnico} <span style={{ fontSize: 10, opacity: 0.6, verticalAlign: "middle" }}>▼</span>
             </span>
+            {isDemo && (
+              <span style={{
+                background: "rgba(255, 152, 0, 0.15)",
+                color: "#e65100",
+                border: "1px solid rgba(255, 152, 0, 0.4)",
+                padding: "2px 6px",
+                borderRadius: 10,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.5px"
+              }}>
+                DEMO
+              </span>
+            )}
           </div>
 
           {showMenu && (

@@ -41,18 +41,24 @@ Diseñada para adaptarse a cualquier empresa de servicios técnicos, telecomunic
 
 ## 🚀 Guía de Inicio Rápido
 
-### 1. Clonar o Descargar el Proyecto
-```bash
-git clone <URL_DE_TU_REPOSITORIO>
-cd informes-web-template
-```
+### ⚡ Opción A: Exploración Inmediata en Modo Demo (¡Sin Configuración!)
+No necesitas crear un proyecto de Firebase ni configurar credenciales para probar o evaluar la plataforma:
+1. Instala dependencias:
+   ```bash
+   npm install
+   ```
+2. Inicia el servidor local:
+   ```bash
+   npm run dev
+   ```
+3. Abre [http://localhost:3000](http://localhost:3000) y pulsa cualquiera de los botones de **Acceso Demo**:
+   - 👨‍🔧 **Probar como Técnico**: Registra informes, consulta catálogos de materiales y prueba el modo offline.
+   - 👤 **Probar como Supervisor**: Revisa la bandeja con informes precargados, métricas y descarga masiva en ZIP.
+   - ⚙️ **Probar como Administrador**: Gestiona usuarios y roles en memoria.
 
-### 2. Instalar Dependencias
-```bash
-npm install
-```
+---
 
-### 3. Configurar Variables de Entorno
+### 🌐 Opción B: Conexión con tu Base de Datos Firebase (Producción)
 Copia el archivo de plantilla `.env.example` a `.env.local`:
 ```bash
 cp .env.example .env.local

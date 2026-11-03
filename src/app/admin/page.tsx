@@ -8,6 +8,7 @@ import {
   listarUsuarios, crearUsuario, actualizarUsuario, eliminarUsuarioDB, enviarCorreoReset,
   type UsuarioInfo, type Rol,
 } from "@/lib/auth-service";
+import { esModoDemo } from "@/lib/demo-data";
 import { Modal } from "@/components/Modal";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
@@ -18,6 +19,7 @@ export default function AdminPage() {
   const [usuarios, setUsuarios] = useState<UsuarioInfo[]>([]);
   const [cargando, setCargando] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   // Form nuevo usuario
   const [nuevoEmail, setNuevoEmail] = useState("");
@@ -38,6 +40,7 @@ export default function AdminPage() {
     }
     setSesion(s);
     setDarkMode(localStorage.getItem("app_theme") === "dark");
+    setIsDemo(esModoDemo());
     cargarUsuarios();
   }, [router]);
 
@@ -141,6 +144,20 @@ export default function AdminPage() {
             <span className="desktop-hide" style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none" }}>
               {sesion.nombre} <span style={{ fontSize: 10, opacity: 0.6, verticalAlign: "middle" }}>▼</span>
             </span>
+            {isDemo && (
+              <span style={{
+                background: "rgba(255, 152, 0, 0.15)",
+                color: "#e65100",
+                border: "1px solid rgba(255, 152, 0, 0.4)",
+                padding: "2px 6px",
+                borderRadius: 10,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.5px"
+              }}>
+                DEMO
+              </span>
+            )}
           </div>
 
           {menuOpen && (

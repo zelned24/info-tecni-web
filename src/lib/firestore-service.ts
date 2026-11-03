@@ -12,6 +12,17 @@
 import { db } from "./firebase";
 import { GOOGLE_SHEETS_ID } from "./config";
 import {
+  esModoDemo,
+  obtenerDemoInformes,
+  guardarDemoInformes,
+  obtenerDemoSolicitudes,
+  guardarDemoSolicitudes,
+  DEMO_MATERIALES,
+  DEMO_DISPOSITIVOS,
+  DEMO_AGENCIAS,
+  DEMO_USUARIOS,
+} from "./demo-data";
+import {
   collection,
   doc,
   getDoc,
@@ -33,6 +44,22 @@ export async function getDocument(
   collectionName: string,
   docId: string
 ): Promise<DocumentData | null> {
+  if (esModoDemo()) {
+    if (collectionName === "informes") {
+      const inf = obtenerDemoInformes();
+      return inf[docId] || null;
+    }
+    if (collectionName === "solicitudes") {
+      const sol = obtenerDemoSolicitudes();
+      return sol[docId] || null;
+    }
+    if (collectionName === "materiales") {
+      return DEMO_MATERIALES[docId] || null;
+    }
+    if (collectionName === "dispositivos") {
+      return DEMO_DISPOSITIVOS[docId] || null;
+    }
+  }
   try {
     const snap = await getDoc(doc(db, collectionName, docId));
     return snap.exists() ? snap.data() : null;
@@ -99,6 +126,27 @@ export async function deleteDocument(
 export async function listCollection(
   collectionName: string
 ): Promise<Record<string, DocumentData>> {
+  if (esModoDemo()) {
+    if (collectionName === "informes") return obtenerDemoInformes();
+    if (collectionName === "solicitudes") return obtenerDemoSolicitudes();
+    if (collectionName === "materiales") return DEMO_MATERIALES;
+    if (collectionName === "dispositivos") return DEMO_DISPOSITIVOS;
+    if (collectionName === "agencias") {
+      const agsObj: Record<string, DocumentData> = {};
+      DEMO_AGENCIAS.forEach((ag, idx) => {
+        agsObj[`ag_${idx}`] = { nombre: ag };
+      });
+      return agsObj;
+    }
+    if (collectionName === "usuarios") {
+      const usersObj: Record<string, DocumentData> = {};
+      DEMO_USUARIOS.forEach((u) => {
+        usersObj[u.uid] = u;
+      });
+      return usersObj;
+    }
+  }
+
   const result: Record<string, DocumentData> = {};
   try {
     const snap = await getDocs(query(collection(db, collectionName)));
@@ -117,6 +165,32 @@ export function onCollectionChange(
   collectionName: string,
   callback: (data: Record<string, DocumentData>) => void
 ): Unsubscribe {
+  if (esModoDemo()) {
+    const emitirActual = () => {
+      if (collectionName === "informes") callback(obtenerDemoInformes());
+      else if (collectionName === "solicitudes") callback(obtenerDemoSolicitudes());
+      else if (collectionName === "materiales") callback(DEMO_MATERIALES);
+      else if (collectionName === "dispositivos") callback(DEMO_DISPOSITIVOS);
+    };
+
+    emitirActual();
+
+    const listener = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt.detail?.type === collectionName) {
+        callback(customEvt.detail.data);
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("app_demo_sync", listener);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("app_demo_sync", listener);
+      }
+    };
+  }
+
   return onSnapshot(
     query(collection(db, collectionName)),
     (snap) => {
@@ -169,6 +243,13 @@ export async function obtenerCuentasSupervisores(): Promise<
 export async function obtenerCatalogo(
   nombre: string
 ): Promise<DocumentData> {
+  if (esModoDemo()) {
+    if (nombre === "materiales") return DEMO_MATERIALES;
+    if (nombre === "dispositivos") return DEMO_DISPOSITIVOS;
+    if (nombre === "supervisores") return ["María Morales", "David Silva"];
+    if (nombre === "tecnicos") return ["Carlos Mendoza", "Juan Pérez"];
+  }
+
   // Materiales y dispositivos son colecciones raíz
   if (nombre === "materiales" || nombre === "dispositivos") {
     const datos = await listCollection(nombre);
@@ -179,7 +260,7 @@ export async function obtenerCatalogo(
     // Fallback: formato legacy /catalogo/{nombre} → { items: {...} }
     const docData = await getDocument("catalogo", nombre);
     if (docData) return docData.items || docData.lista || {};
-    return {};
+    return nombre === "materiales" ? DEMO_MATERIALES : DEMO_DISPOSITIVOS;
   }
 
   // Supervisores y otros: /catalogo/{nombre}
@@ -209,18 +290,21 @@ export async function obtenerAgencias(): Promise<
 
 /** Devuelve solo los nombres de agencias como lista plana */
 export async function obtenerListaAgencias(): Promise<string[]> {
+  if (esModoDemo()) return DEMO_AGENCIAS;
   const datos = await listCollection("agencias");
-  return Object.values(datos)
+  const ags = Object.values(datos)
     .map((d) => d.nombre || "")
     .filter(Boolean)
     .sort();
+  return ags.length > 0 ? ags : DEMO_AGENCIAS;
 }
 
 /** Devuelve la lista combinada de agencias (Firestore + Google Sheets opcional) */
 export async function obtenerAgenciasCompletas(): Promise<string[]> {
+  if (esModoDemo()) return DEMO_AGENCIAS;
   const agsFirestore = await obtenerListaAgencias();
   if (!GOOGLE_SHEETS_ID) {
-    return agsFirestore;
+    return agsFirestore.length > 0 ? agsFirestore : DEMO_AGENCIAS;
   }
   let agsSheets: string[] = [];
   try {
@@ -248,7 +332,8 @@ export async function obtenerAgenciasCompletas(): Promise<string[]> {
     console.warn("[Agencias] Sincronización opcional de Google Sheets no disponible:", err);
   }
 
-  return Array.from(new Set([...agsFirestore, ...agsSheets])).sort();
+  const combinadas = Array.from(new Set([...agsFirestore, ...agsSheets])).sort();
+  return combinadas.length > 0 ? combinadas : DEMO_AGENCIAS;
 }
 
 
@@ -257,10 +342,20 @@ export async function obtenerAgenciasCompletas(): Promise<string[]> {
 export async function obtenerInformes(): Promise<
   Record<string, DocumentData>
 > {
-  return listCollection("informes");
+  if (esModoDemo()) return obtenerDemoInformes();
+  const res = await listCollection("informes");
+  return Object.keys(res).length > 0 ? res : (esModoDemo() ? obtenerDemoInformes() : res);
 }
 
 export async function obtenerInformesPorTecnico(tecnico: string): Promise<Record<string, DocumentData>> {
+  if (esModoDemo()) {
+    const todos = obtenerDemoInformes();
+    const filtrados: Record<string, DocumentData> = {};
+    Object.entries(todos).forEach(([k, v]) => {
+      if (v.metadatos?.tecnico === tecnico) filtrados[k] = v;
+    });
+    return filtrados;
+  }
   const result: Record<string, DocumentData> = {};
   try {
     const q = query(collection(db, "informes"), where("metadatos.tecnico", "==", tecnico));
@@ -283,10 +378,25 @@ export async function marcarInformeEliminado(iid: string, motivo: string): Promi
       hour: "2-digit",
       minute: "2-digit",
     }),
-    tecnico: "Supervisor", // This can be improved if we pass supervisor's name, but fine for now
+    tecnico: "Supervisor",
     tipo: "eliminación",
     descripcion: `Eliminado: ${motivo}`,
   };
+
+  if (esModoDemo()) {
+    const inf = obtenerDemoInformes();
+    if (inf[iid]) {
+      const histPrev = inf[iid].modificaciones || [];
+      inf[iid] = {
+        ...inf[iid],
+        estado: "Eliminado",
+        motivo_eliminacion: motivo,
+        modificaciones: [...histPrev, entradaHistorial],
+      };
+      guardarDemoInformes(inf);
+      return true;
+    }
+  }
 
   try {
     const docActual = await getDocument("informes", iid);
@@ -335,6 +445,20 @@ export async function exportarInforme(
     updated_at: nowISO,
   };
 
+  if (esModoDemo()) {
+    const inf = obtenerDemoInformes();
+    const id = idNubeActual || `inf_demo_${Date.now()}`;
+    const docActual = inf[id];
+    const histPrev = docActual?.modificaciones || [];
+    paquete.modificaciones = [...histPrev, entradaHistorial];
+    if (docActual?.estado) paquete.estado = docActual.estado;
+    if (docActual?.supervisor) paquete.supervisor = docActual.supervisor;
+    if (docActual?.created_at) paquete.created_at = docActual.created_at;
+    inf[id] = paquete;
+    guardarDemoInformes(inf);
+    return { ok: true, id };
+  }
+
   try {
     if (idNubeActual) {
       const docActual = await getDocument("informes", idNubeActual);
@@ -361,10 +485,24 @@ export async function actualizarCampoInforme(
   iid: string,
   campos: Partial<DocumentData>
 ): Promise<boolean> {
+  if (esModoDemo()) {
+    const inf = obtenerDemoInformes();
+    if (inf[iid]) {
+      inf[iid] = { ...inf[iid], ...campos };
+      guardarDemoInformes(inf);
+      return true;
+    }
+  }
   return updateDocument("informes", iid, campos);
 }
 
 export async function eliminarInforme(iid: string): Promise<boolean> {
+  if (esModoDemo()) {
+    const inf = obtenerDemoInformes();
+    delete inf[iid];
+    guardarDemoInformes(inf);
+    return true;
+  }
   return deleteDocument("informes", iid);
 }
 
@@ -373,12 +511,20 @@ export async function eliminarInforme(iid: string): Promise<boolean> {
 export async function obtenerSolicitudes(): Promise<
   Record<string, DocumentData>
 > {
+  if (esModoDemo()) return obtenerDemoSolicitudes();
   return listCollection("solicitudes");
 }
 
 export async function agregarSolicitud(
   datos: DocumentData
 ): Promise<string | null> {
+  if (esModoDemo()) {
+    const sol = obtenerDemoSolicitudes();
+    const nid = `sol_demo_${Date.now()}`;
+    sol[nid] = datos;
+    guardarDemoSolicitudes(sol);
+    return nid;
+  }
   return addDocument("solicitudes", datos);
 }
 
@@ -386,10 +532,24 @@ export async function actualizarSolicitud(
   iid: string,
   campos: Partial<DocumentData>
 ): Promise<boolean> {
+  if (esModoDemo()) {
+    const sol = obtenerDemoSolicitudes();
+    if (sol[iid]) {
+      sol[iid] = { ...sol[iid], ...campos };
+      guardarDemoSolicitudes(sol);
+      return true;
+    }
+  }
   return updateDocument("solicitudes", iid, campos);
 }
 
 export async function eliminarSolicitud(iid: string): Promise<boolean> {
+  if (esModoDemo()) {
+    const sol = obtenerDemoSolicitudes();
+    delete sol[iid];
+    guardarDemoSolicitudes(sol);
+    return true;
+  }
   return deleteDocument("solicitudes", iid);
 }
 
@@ -419,6 +579,14 @@ export async function asignarTecnicos(
   iid: string,
   tecnicos: string[]
 ): Promise<boolean> {
+  if (esModoDemo()) {
+    const inf = obtenerDemoInformes();
+    if (inf[iid]) {
+      inf[iid] = { ...inf[iid], tecnicos_asignados: tecnicos };
+      guardarDemoInformes(inf);
+      return true;
+    }
+  }
   return updateDocument("informes", iid, { tecnicos_asignados: tecnicos });
 }
 
@@ -427,10 +595,14 @@ export async function asignarTecnicos(
  * Útil para el selector de asignación.
  */
 export async function obtenerListaTecnicos(): Promise<string[]> {
+  if (esModoDemo()) {
+    return ["Carlos Mendoza", "Juan Pérez"];
+  }
   const usuarios = await listCollection("usuarios");
-  return Object.values(usuarios)
+  const tecs = Object.values(usuarios)
     .filter((u) => u.rol === "tecnico")
     .map((u) => u.nombre || u.email)
     .filter(Boolean)
     .sort();
+  return tecs.length > 0 ? tecs : ["Carlos Mendoza", "Juan Pérez"];
 }
