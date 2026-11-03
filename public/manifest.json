@@ -1,0 +1,22 @@
+{
+  "name": "ReportHub - Sistema de Informes Técnicos",
+  "short_name": "ReportHub",
+  "description": "Sistema y PWA de Registro y Seguimiento de Informes Técnicos de Campo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f1a",
+  "theme_color": "#2E75B6",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
